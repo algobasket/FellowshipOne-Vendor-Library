@@ -70,7 +70,7 @@ class API{
     $this->d($args);
     if(count($args)>0 && gettype($args[0]) != "array" && gettype($args[0]) != "object") $this->pathIds[] = array_shift($args);
     if(isset($this->paths[$this->endpointId])){
-      $r = $this->invoke($this->endpointId, $this->paths[$this->endpointId]['verb'],$this->paths[$this->endpointId]['path'],$this->pathIds,current($args));
+      $r = $this->invoke($this->endpointId, $this->paths[$this->endpointId]['verb'], $this->paths[$this->endpointId]['path'],$this->pathIds,current($args));
       $this->reset();
       return $r;
     }
@@ -196,7 +196,6 @@ class API{
     );
 
     $ch = curl_init();
-
     if($method=='GET' && is_array($data)){
       $url .= "?" . http_build_query($data);
       $data = null;
