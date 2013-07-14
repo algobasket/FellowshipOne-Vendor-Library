@@ -62,6 +62,27 @@
  require_once('../lib/FellowshipOne.php');
  require_once('../lib/Credentials.php');
 
+ function old_enough($date, $age_limit=15){
+  $birthDate = date('d\/j\/Y', strtotime($date));
+  //explode the date to get month, day and year
+  $birthDate = explode("/", $birthDate);
+   //get age from date or birthdate
+  $age = (date("md", date("U", mktime(0, 0, 0, $birthDate[0], $birthDate[1], $birthDate[2]))) > date("md") ? ((date("Y")-$birthDate[2])-1):(date("Y")-$birthDate[2]));
+  return $age >= $age_limit;
+ }
+
+ function get_campus($f1, $id){
+   $r = $f1->json()->contributionreceipts()->search(array(
+     'individualID' => $id,
+     'recordsPerPage' => 100
+   ))->get();
+   $results = json_decode($r, TRUE);
+   $mostRecent = end($results['results']['contributionReceipt']);
+   $subFund = $mostRecent['subFund']['name'];
+   $campus = explode(' ', trim($subFund));
+   return $campus[0];
+ }
+
  if($_POST){
    $phone = $_POST['phone'];
    
@@ -79,11 +100,13 @@
     
      $results = json_decode($p, TRUE);
      if($results['results']['@count'] > 0){
-       echo "<h3>Found ".$results['results']['@count']." people that have the phone number ".$phone."</h3>";     
        foreach($results['results']['person'] as $key => $value){
+         $campus = get_campus($f1, $value['@id']);
+         if (old_enough($value['dateOfBirth'])){
           // var_dump($value);
           echo "<div>";
           echo "<h4>".$value['firstName']." ".$value['lastName']." <em>(".$value['@id'].")</em> </h4>";
+          echo "<h6>".$campus." Campus</h6>";
           foreach($value['addresses']['address'] as $a_key => $address){
             if($address['addressType']['@id'] == 1){ //Primary Address
               echo "<address>";
@@ -101,7 +124,8 @@
           }
           echo "</ul>";
           echo "</div>";
-       }
+        }
+      }
     }else{
      echo "<h3>Couldn't find anyone with the phone number ".$phone."</h3>";    
     }

@@ -11,7 +11,7 @@
 namespace F1;
 
 class API{
-  public $debug = false;
+  public $debug = true;
   public $error = null;
   public $paths;
   protected $token = '';
