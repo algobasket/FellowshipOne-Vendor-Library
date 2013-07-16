@@ -62,6 +62,17 @@
  require_once('../lib/FellowshipOne.php');
  require_once('../lib/Credentials.php');
 
+ $blacklist = array(
+   '8642266585',
+   '8646726585',
+   '8648890000',
+   '8434922080',
+   '8649659370',
+   '8437667747',
+   '8434077986',
+   '8642710624'
+ );
+
  function old_enough($date, $age_limit=15){
   $birthDate = date('d\/j\/Y', strtotime($date));
   //explode the date to get month, day and year
@@ -74,19 +85,49 @@
  function get_campus($f1, $id){
    $r = $f1->json()->contributionreceipts()->search(array(
      'individualID' => $id,
-     'recordsPerPage' => 100
+     'recordsPerPage' => 1,
+     'startReceivedDate' => date('c',strtotime("-6 months")),
+     'endReceiveDate' => date('c', strtotime("now"))
    ))->get();
+
    $results = json_decode($r, TRUE);
-   $mostRecent = end($results['results']['contributionReceipt']);
-   $subFund = $mostRecent['subFund']['name'];
-   $campus = explode(' ', trim($subFund));
-   return $campus[0];
+   if(isset($results['results']['contributionReceipt'][0])){
+     $mostRecent = $results['results']['contributionReceipt'][0];
+     // var_dump($mostRecent);
+     $subFund = $mostRecent['subFund']['name'];
+     $campus = explode(' ', trim($subFund));
+     return $campus[0];
+   }else{
+     return '';
+   }
+ }
+
+ function is_mobile($people, $phone){
+   $found = false;
+   foreach($people as $person => $value){
+      foreach($value['communications']['communication'] as $key => $c){
+        if($c['communicationType']['@id'] == 3 && $c['searchCommunicationValue'] == $phone){
+            $found[] = $person;
+        }
+      }
+   }
+   return $found;
  }
 
  if($_POST){
    $phone = $_POST['phone'];
+   $is_mobile = false;
+    
+   $data = array(
+       'telephone' => $phone,
+       'persons' => array()
+     );
    
    try{
+     if(in_array($phone, $blacklist)){
+        throw new Exception('Number Blacklisted');
+     }
+
      $settings = array(
        'key' => $token,
        'url' => $url
@@ -97,40 +138,44 @@
        'communication' => $phone,
        'include' => 'addresses,communications' //Comma separation only or it breaks
       ))->get();
-    
+
+     
      $results = json_decode($p, TRUE);
+ 
      if($results['results']['@count'] > 0){
+       $is_mobile = is_mobile($results['results']['person'], $phone);
+      
        foreach($results['results']['person'] as $key => $value){
-         $campus = get_campus($f1, $value['@id']);
-         if (old_enough($value['dateOfBirth'])){
-          // var_dump($value);
-          echo "<div>";
-          echo "<h4>".$value['firstName']." ".$value['lastName']." <em>(".$value['@id'].")</em> </h4>";
-          echo "<h6>".$campus." Campus</h6>";
-          foreach($value['addresses']['address'] as $a_key => $address){
-            if($address['addressType']['@id'] == 1){ //Primary Address
-              echo "<address>";
-              echo $address['address1']."<br>";
-              echo $address['city'].", ";
-              echo $address['postalCode']."<br>";
-              echo "</address>"; 
+         if($is_mobile === false || in_array($key, $is_mobile)){
+           if (old_enough($value['dateOfBirth'])){
+              $that = &$data['persons'][];
+              $that['id'] = (float) $value['@id'];
+              $that['campus'] = (string) get_campus($f1, $value['@id']);
+              $that['firstName'] = (string) $value['firstName'];
+              $that['lastName'] = (string) $value['lastName'];
+              foreach($value['communications']['communication'] as $c_key => $comm){
+                if($comm['communicationGeneralType'] == 'Email'){
+                  $that['email'] = (string) $comm['communicationValue'];
+                }
+              }
+
+              foreach($value['addresses']['address'] as $a_key => $address){
+                if($address['addressType']['@id'] == 1){ //Primary Address
+                  $that['address']['streetAddress'] = (string) $address['address1'];
+                  $that['address']['streetAddress2'] = (string) (isset($address['address2'])) ? $address['address2'] : '';
+                  $that['address']['city'] = (string) $address['city'];
+                  $that['address']['state'] = (string) $address['stProvince'];
+                  $that['address']['postalCode'] = (int) $address['postalCode'];
+                }
+              }
             }
-          }
-          
-          echo "<h5>Contact Info</h5>";
-          echo '<ul class="communications">';        
-          foreach($value['communications']['communication'] as $c_key => $comm){
-            echo '<li><span>'.$comm['communicationType']['name'].':</span>   '.$comm['communicationValue'].'</li>';
-          }
-          echo "</ul>";
-          echo "</div>";
+          }      
         }
-      }
-    }else{
-     echo "<h3>Couldn't find anyone with the phone number ".$phone."</h3>";    
-    }
+     }
+     var_dump($data);
+     return false;
    }catch(Exception $e){
-      var_dump($e);
+      var_dump($e->getMessage());
    }
 }
 
