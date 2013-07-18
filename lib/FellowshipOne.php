@@ -11,7 +11,7 @@
 namespace F1;
 
 class API{
-  public $debug = false;
+  public $debug = true;
   public $error = null;
   public $paths;
   protected $token = '';
@@ -202,13 +202,14 @@ class API{
     }
 
     if(($method=='PUT' || $method=='POST') && (gettype($data)=="array" || gettype($data)=="object")){
-      $data = json_encode($data);
-      $defaults[CURLOPT_POSTFIELDS] = http_build_query($data);    
+      $defaults[CURLOPT_POSTFIELDS] = json_encode($data);    
     }
+
     $defaults[CURLOPT_URL] = $url; 
     curl_setopt_array($ch, $defaults);
-
+    
     if(!$response = curl_exec($ch)) {
+        echo "Error!";
         trigger_error(curl_error($ch)); 
     }
 
